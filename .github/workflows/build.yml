@@ -3,27 +3,58 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ["v*"]
 
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            os: Linux
+            arch: x86_64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            os: Linux
+            arch: aarch64
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            os: macOS
+            arch: x86_64
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            os: macOS
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - run: rustup update stable && rustup default stable
       - run: cargo build --release --manifest-path scripts/okf-cli/Cargo.toml
-      - id: os
-        run: echo "name=$(uname -s)" >> "$GITHUB_OUTPUT"
+      - run: cp scripts/okf-cli/target/release/okf-cli okf-cli-${{ matrix.os }}-${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
-          name: okf-cli-${{ steps.os.outputs.name }}
-          path: scripts/okf-cli/target/release/okf-cli
+          name: okf-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: okf-cli-${{ matrix.os }}-${{ matrix.arch }}
+
+  nightly:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: okf-cli-*
+          merge-multiple: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightly
+          path: okf-cli-*
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,7 +65,5 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
           files: okf-cli-*
           generate_release_notes: true
-          make_latest: true
