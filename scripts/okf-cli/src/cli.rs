@@ -1,5 +1,6 @@
-use std::env;
 use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
 
 pub enum Command {
     Tree(Config),
@@ -23,93 +24,65 @@ pub struct ValidateConfig {
     pub path: PathBuf,
 }
 
-pub fn parse_args() -> Result<Command, String> {
-    let mut args = env::args().skip(1);
-    let Some(command) = args.next() else {
-        return Err(usage().to_string());
-    };
-
-    match command.as_str() {
-        "tree" => Ok(Command::Tree(parse_command_args(args)?)),
-        "metadata" => Ok(Command::Metadata(parse_command_args(args)?)),
-        "tag" => Ok(Command::Tag(parse_tag_args(args)?)),
-        "validate" => Ok(Command::Validate(parse_validate_args(args)?)),
-        _ => Err(usage().to_string()),
-    }
+#[derive(Parser, Debug)]
+#[command(name = "okf-cli", version, about = "OKF knowledge base CLI")]
+struct Cli {
+    #[command(subcommand)]
+    command: CliCommand,
 }
 
-fn parse_command_args(args: impl Iterator<Item = String>) -> Result<Config, String> {
-    let mut show_non_md = false;
-    let mut positional = Vec::new();
-
-    for arg in args {
-        if arg == "--show-non-md" {
-            show_non_md = true;
-        } else {
-            positional.push(arg);
-        }
-    }
-
-    if positional.is_empty() || positional.len() > 2 {
-        return Err(usage().to_string());
-    }
-
-    let max_depth = positional
-        .get(1)
-        .map(|value| {
-            value
-                .parse::<usize>()
-                .map_err(|_| format!("Error: Invalid max_depth '{}'.", value))
-        })
-        .transpose()?
-        .unwrap_or(2);
-
-    Ok(Config {
-        start_file: PathBuf::from(&positional[0]),
-        max_depth,
-        show_non_md,
-    })
+#[derive(Subcommand, Debug)]
+enum CliCommand {
+    Tree {
+        #[arg(long)]
+        show_non_md: bool,
+        start_file: PathBuf,
+        #[arg(default_value_t = 2)]
+        max_depth: usize,
+    },
+    Metadata {
+        #[arg(long)]
+        show_non_md: bool,
+        start_file: PathBuf,
+        #[arg(default_value_t = 2)]
+        max_depth: usize,
+    },
+    Tag {
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
+        tags: Vec<String>,
+    },
+    Validate {
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
 }
 
-fn parse_tag_args(args: impl Iterator<Item = String>) -> Result<TagConfig, String> {
-    let mut start_dir = PathBuf::from(".");
-    let mut tags = Vec::new();
-    let mut args = args.peekable();
-
-    while let Some(arg) = args.next() {
-        if arg == "--dir" {
-            let Some(dir) = args.next() else {
-                return Err(usage().to_string());
-            };
-            start_dir = PathBuf::from(dir);
-            continue;
-        }
-
-        tags.push(arg);
+pub fn parse_args() -> Command {
+    let cli = Cli::parse();
+    match cli.command {
+        CliCommand::Tree {
+            start_file,
+            max_depth,
+            show_non_md,
+        } => Command::Tree(Config {
+            start_file,
+            max_depth,
+            show_non_md,
+        }),
+        CliCommand::Metadata {
+            start_file,
+            max_depth,
+            show_non_md,
+        } => Command::Metadata(Config {
+            start_file,
+            max_depth,
+            show_non_md,
+        }),
+        CliCommand::Tag { tags, dir } => Command::Tag(TagConfig {
+            tags,
+            start_dir: dir,
+        }),
+        CliCommand::Validate { path } => Command::Validate(ValidateConfig { path }),
     }
-
-    Ok(TagConfig { tags, start_dir })
-}
-
-fn parse_validate_args(args: impl Iterator<Item = String>) -> Result<ValidateConfig, String> {
-    let positional: Vec<String> = args.collect();
-    if positional.len() > 1 {
-        return Err(usage().to_string());
-    }
-
-    Ok(ValidateConfig {
-        path: positional
-            .first()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(".")),
-    })
-}
-
-fn usage() -> &'static str {
-    "Usage:
-  okf-cli tree [--show-non-md] <start_file.md> [max_depth (default 2)]
-  okf-cli metadata [--show-non-md] <start_file.md> [max_depth (default 2)]
-  okf-cli tag [--dir <start_dir>]
-  okf-cli tag [--dir <start_dir>] <tag> [<tag> ...]
-  okf-cli validate [path]"
 }

@@ -6,14 +6,10 @@ mod tags;
 mod tree;
 mod validate;
 
-use cli::{parse_args, Command};
-use shared::exit_with_error;
+use cli::{Command, parse_args};
 
 fn main() {
-    let command = match parse_args() {
-        Ok(command) => command,
-        Err(message) => exit_with_error(&message),
-    };
+    let command = parse_args();
 
     match command {
         Command::Tree(config) => tree::run_tree(&config),
