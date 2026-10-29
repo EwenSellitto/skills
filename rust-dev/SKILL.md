@@ -11,6 +11,9 @@ When reviewing, report each violation with the rule it breaks. A codebase's own 
 
 Done means `cargo fmt`, `cargo clippy --all-targets --all-features`, and `cargo test` all pass clean.
 
+Before writing or reviewing code with `unsafe`, FFI, `transmute`, or atomics, read [unsafe.md](unsafe.md).
+Before writing or reviewing code with `async` or `.await`, read [async.md](async.md).
+
 ## Formatting
 
 rustfmt with `max_width = 100`, `hex_literal_case = Lower`, `format_macro_matchers = true`, `imports_granularity = Module`. Escape invisible characters in literals (`\u{200D}`). `#[rustfmt::skip]` only for deliberate alignment (matrices, aligned tables of similar lines) or generated code.
@@ -119,21 +122,6 @@ rustfmt with `max_width = 100`, `hex_literal_case = Lower`, `format_macro_matche
 - Each doc adds what the signature cannot say. A comment restating the name gets deleted.
 - Sections as applicable: `# Examples`, `# Errors`, `# Panics` (every panic condition), `# Safety` (every `unsafe` fn/trait invariant).
 - Doc tests prefer `no_run`/`compile_fail`/`should_panic` over `ignore`.
-
-## Unsafe
-
-- `unsafe` only with no safe equivalent; "faster" needs profiling proof plus benchmarks.
-- Wrap it in a small, sound safe abstraction (ideally its own crate). A safe API that lets any input trigger UB is unsound and is a bug, even if tests pass.
-- Several one-line `unsafe` blocks over one large block; each preceded by `// SAFETY:` justifying correctness.
-- `transmute` and FFI need `#[repr(C)]`/`#[repr(transparent)]`; uninitialised memory goes through `MaybeUninit`, aliased mutation through `UnsafeCell`.
-- Safety never depends on a safe trait impl behaving (`Eq`, `Hash`, `Ord`, `Deref` may lie or panic); require an `unsafe trait` instead.
-- Cross-thread synchronisation uses `Acquire`/`Release` or stronger; `Relaxed` only for standalone counters.
-
-## Async
-
-- Never block in async code (no `std::thread::sleep`, blocking I/O, or heavy compute); offload with the runtime's blocking pool.
-- Keep `!Send` values (`Rc`, `RefCell` borrows, `MutexGuard`) out of scope across `.await`.
-- Any `.await` may never resume (the future can be dropped): restore invariants with a drop guard, not code after the await. Thread-locals are invalid across `.await`.
 
 ## Language features
 
