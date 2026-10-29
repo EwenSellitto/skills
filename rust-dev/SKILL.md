@@ -38,7 +38,6 @@ rustfmt with `max_width = 100`, `hex_literal_case = Lower`, `format_macro_matche
 - Libraries return `impl Iterator` and accept `impl IntoIterator` when they only iterate. `Vec`/slices are fine in application code or when callers index, own, or the fn exists to build a collection.
 - `impl Trait` for a parameter used once; `T: Bound` generics stay simple (`AsRef<Path>`), complex bounds are a design smell.
 - Bounds live on `impl` blocks, not struct definitions. Once any bound needs `where`, or the `<..>` list passes ~30 chars, move all bounds to `where`.
-- Write elided lifetimes visibly: `Message<'_>`, never bare `Message`.
 - Use `Self` in signatures and trait impls (`fn new(parent: &Self) -> Self`); construct with the concrete type name.
 - `impl Into<T>` parameters only in library APIs where call-site ergonomics clearly outweigh signature complexity.
 - Closure parameters take the loosest bound that works: `FnOnce` if called once, else `FnMut`, `Fn` only when shared or called concurrently.
