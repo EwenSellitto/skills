@@ -28,37 +28,46 @@ case "$ARCH" in
         ;;
 esac
 
-SKILL_TARGET="$HOME/.config/opencode/skills"
-if [[ ! -d "$SKILL_TARGET" ]]; then
-    SKILL_TARGET="$HOME/.agents/skills"
+SKILL_TARGETS=("$HOME/.agents/skills")
+if [[ -d "$HOME/.config/opencode/skills" ]]; then
+    SKILL_TARGETS=("$HOME/.config/opencode/skills")
+fi
+if [[ -d "$HOME/.claude" ]]; then
+    SKILL_TARGETS+=("$HOME/.claude/skills")
 fi
 
 echo "Downloading $BINARY_NAME ($OS-$ARCH)..."
 mkdir -p "$HOME/.local/bin"
 url="https://github.com/$REPO/releases/latest/download/okf-cli-$OS-$ARCH"
 if command -v curl &>/dev/null; then
-    curl -fsSL "$url" -o "$BINARY_DST"
+    curl -fsSL "$url" -o "$BINARY_DST.tmp"
 elif command -v wget &>/dev/null; then
-    wget -q "$url" -O "$BINARY_DST"
+    wget -q "$url" -O "$BINARY_DST.tmp"
 else
     echo "Error: need curl or wget"
     exit 1
 fi
-chmod +x "$BINARY_DST"
+chmod +x "$BINARY_DST.tmp"
+# Swap in atomically so a failed download never leaves a broken binary.
+mv -f "$BINARY_DST.tmp" "$BINARY_DST"
 echo "  -> $BINARY_DST"
 
 echo "Linking skills..."
-mkdir -p "$SKILL_TARGET"
-for skill in okf okf-retreive; do
-    src="$SKILL_DIR/$skill"
-    link="$SKILL_TARGET/$skill"
-    if [[ -L "$link" || -d "$link" ]]; then
-        rm -rf "$link"
-    fi
-    ln -sf "$src" "$link"
-    echo "  -> $link"
+for target in "${SKILL_TARGETS[@]}"; do
+    mkdir -p "$target"
+    for skill in okf okf-retreive rust-dev; do
+        src="$SKILL_DIR/$skill"
+        link="$target/$skill"
+        if [[ "$(readlink "$link" || true)" == "$src" ]]; then
+            echo "  = $link (already linked)"
+        elif [[ -e "$link" && ! -L "$link" ]]; then
+            echo "  ! $link exists and is not a symlink, skipping"
+        else
+            ln -sfn "$src" "$link"
+            echo "  -> $link"
+        fi
+    done
 done
-echo "  target: $SKILL_TARGET"
 
 shell_config=""
 case "$SHELL" in
