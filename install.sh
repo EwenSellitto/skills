@@ -49,7 +49,7 @@ echo "  -> $BINARY_DST"
 
 echo "Linking skills..."
 mkdir -p "$SKILL_TARGET"
-for skill in okf okf-retreive; do
+for skill in okf okf-retreive rust-dev; do
     src="$SKILL_DIR/$skill"
     link="$SKILL_TARGET/$skill"
     if [[ -L "$link" || -d "$link" ]]; then
